@@ -20,6 +20,8 @@ resource "aws_subnet" "public" {
   vpc_id            = "${data.aws_vpc.default.id}"
   availability_zone = "${element(var.availability_zones, count.index)}"
   cidr_block        = "${cidrsubnet(signum(length(var.cidr_block)) == 1 ? var.cidr_block : data.aws_vpc.default.cidr_block, ceil(log(length(data.aws_availability_zones.available.names) * 2, 2)), length(data.aws_availability_zones.available.names) + count.index)}"
+  ipv6_cidr_block   = "${cidrsubnet(data.aws_vpc.default.ipv6_cidr_block, 8, length(data.aws_availability_zones.available.names) + count.index)}"
+  assign_ipv6_address_on_creation = true
 
   tags = {
     "Name"      = "${module.public_subnet_label.id}${var.delimiter}${replace(element(var.availability_zones, count.index),"-",var.delimiter)}"
@@ -34,6 +36,11 @@ resource "aws_route_table" "public" {
 
   route {
     cidr_block = "0.0.0.0/0"
+    gateway_id = "${var.igw_id}"
+  }
+
+  route {
+    ipv6_cidr_block = "::/0"
     gateway_id = "${var.igw_id}"
   }
 
@@ -66,6 +73,15 @@ resource "aws_network_acl" "public" {
     protocol   = "-1"
   }
 
+  egress {
+    rule_no         = 101
+    action          = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+  }
+
   ingress {
     rule_no    = 100
     action     = "allow"
@@ -73,6 +89,15 @@ resource "aws_network_acl" "public" {
     from_port  = 0
     to_port    = 0
     protocol   = "-1"
+  }
+
+  ingress {
+    rule_no         = 101
+    action          = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
   }
 
   tags = "${module.public_label.tags}"

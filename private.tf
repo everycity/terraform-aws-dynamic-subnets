@@ -20,6 +20,8 @@ resource "aws_subnet" "private" {
   vpc_id            = "${data.aws_vpc.default.id}"
   availability_zone = "${element(var.availability_zones, count.index)}"
   cidr_block        = "${cidrsubnet(signum(length(var.cidr_block)) == 1 ? var.cidr_block : data.aws_vpc.default.cidr_block, ceil(log(length(data.aws_availability_zones.available.names) * 2, 2)), count.index)}"
+  ipv6_cidr_block   = "${cidrsubnet(data.aws_vpc.default.ipv6_cidr_block, 8, count.index)}"
+  assign_ipv6_address_on_creation = true
 
   tags = {
     "Name"      = "${module.private_subnet_label.id}${var.delimiter}${replace(element(var.availability_zones, count.index),"-",var.delimiter)}"
@@ -37,6 +39,11 @@ resource "aws_route_table" "private" {
     nat_gateway_id = "${element(aws_nat_gateway.default.*.id, count.index)}"
   }
 
+  route {
+    ipv6_cidr_block = "::/0"
+    egress_only_gateway_id = "${var.eoigw_id}"
+  }
+
   tags = "${module.private_label.tags}"
 }
 
@@ -46,6 +53,8 @@ resource "aws_route_table_association" "private" {
   subnet_id      = "${element(aws_subnet.private.*.id, count.index)}"
   route_table_id = "${element(aws_route_table.private.*.id, count.index)}"
 }
+
+
 
 resource "aws_network_acl" "private" {
   count      = "${signum(length(var.private_network_acl_id)) == 0 ? 1 : 0}"
@@ -61,6 +70,15 @@ resource "aws_network_acl" "private" {
     protocol   = "-1"
   }
 
+  egress {
+    rule_no         = 101
+    action          = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+  }
+
   ingress {
     rule_no    = 100
     action     = "allow"
@@ -68,6 +86,15 @@ resource "aws_network_acl" "private" {
     from_port  = 0
     to_port    = 0
     protocol   = "-1"
+  }
+
+  ingress {
+    rule_no         = 101
+    action          = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
   }
 
   tags = "${module.private_label.tags}"

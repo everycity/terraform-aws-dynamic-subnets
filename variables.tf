@@ -41,3 +41,4 @@ variable "private_network_acl_id" {
 }
 
 variable "igw_id" {}
+variable "eoigw_id" {}
